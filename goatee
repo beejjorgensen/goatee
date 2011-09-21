@@ -140,14 +140,23 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 				dnl = 'd' in flags
 
+				leading = l[:mo.start()]
+				trailing = l[mo.end():]
+
 				# for lines that only have goatee code in them, discard
-				# the trailing newline (unless the user has requested
+				# the whitespace (unless the user has requested
 				# otherwise)
-				if l[mo.end()] == '\n' and not _ac.preservenl:
+				if leading.strip() == '' and trailing.strip() == '' \
+					and not _ac.preservenl:
+
+					discard_leading = True
 					dnl = True
+				else:
+					discard_leading = False
 
 				# before the match
-				_ac.fout.write(l[:mo.start()])
+				if not discard_leading:
+					_ac.fout.write(l[:mo.start()])
 
 				# compile and run the expression
 				expr = mo.group('expression')
