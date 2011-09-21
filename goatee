@@ -1,0 +1,268 @@
+#!/usr/bin/python
+#
+# goatee -- simple file includer and macroish file processor
+#
+#       )_)
+#    ___|oo)   File inclusion and macroish processing--
+#   '|  |\_|                                            --for goats!
+#    |||| #
+#    ````
+# 
+# Description:
+# 
+#   Goatee processes an input file, which might include other files, or
+#   execute Python code within special delimiters, and produces an output
+#   file.
+# 
+#   The original intended purpose was to be used in HTML/JS/CSS build
+#   pipelines, where the CSS or HTML might need to be processed with file
+#   inclusion or variable substitution
+# 
+#   Goatee is small, simple, and standalone, to be easily included with
+#   other build-related sources, e.g. Makefiles.
+# 
+# License (MIT):
+# 
+#   Copyright (c) 2011  Brian "Beej Jorgensen" Hall <beej@beej.us>
+# 
+#   Permission is hereby granted, free of charge, to any person
+#   obtaining a copy of this software and associated documentation files
+#   (the "Software"), to deal in the Software without restriction,
+#   including without limitation the rights to use, copy, modify, merge,
+#   publish, distribute, sublicense, and/or sell copies of the Software,
+#   and to permit persons to whom the Software is furnished to do so,
+#   subject to the following conditions:
+# 
+#   The above copyright notice and this permission notice shall be
+#   included in all copies or substantial portions of the Software.
+# 
+#   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+#   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+#   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+#   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#   SOFTWARE.
+# 
+
+
+import sys
+import re
+import mimetypes
+import getopt
+import os.path
+
+# regexes for goatee expressions by input file MIME type:
+
+_goatee_patterns = {
+	'text/html': {
+		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'comment': '<!-- %s -->'
+	},
+
+	'text/css': {
+		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'comment': '/* %s */'
+	},
+
+	'application/javascript': {
+		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'comment': '/* %s */'
+	},
+}
+
+# comment to be added to the top of the output file with -w:
+_warn_comment = "This is a computer-generated file! Do not edit!"
+
+#====================================================================
+_SCRIPT = 'goatee'
+_ac = None # global app context
+
+#====================================================================
+def prints(s):
+	"""Print a string to the output file (python2 can't call it
+	print())."""
+	_ac.fout.write(str(s))
+
+def ps(s):
+	"""Alias for prints()."""
+	return prints(s)
+
+#====================================================================
+def include(filename, evaluate=True, typeoverride=None, _root=False):
+	"""Function to include a file in the output stream."""
+
+	global _ac
+	global _goatee_patterns
+
+	if filename == None or filename == '-':
+		fin = sys.stdin
+		filetype = typeoverride
+
+	else:
+		if typeoverride == None:
+			filetype = mimetypes.guess_type(filename)[0]
+		else:
+			filetype = typeoverride
+
+		fin = open(filename)
+
+	if filetype == None:
+		_usage_exit('%s: file type unknown' % _printable_filename(filename))
+
+	if filetype not in _goatee_patterns:
+		_usage_exit('%s: no eval patterns found for file type %s' % \
+			(_printable_filename(filename), filetype))
+
+	# find the entry for this filetype
+	ent = _goatee_patterns[filetype]
+
+	regex = ent['expr']
+
+    # output a comment warning
+	if _root and _ac.addcomment:
+		_ac.fout.write(ent['comment'] % _warn_comment)
+		_ac.fout.write('\n\n')
+
+	if evaluate:
+		lineno = 0
+
+		for l in fin:
+			lineno += 1
+
+			# we rely on Python's internal caching of regexes, since we
+			# only have a few of them
+			mo = re.search(regex, l);
+
+			if mo:
+				flags = mo.group('flags')
+
+				dnl = 'd' in flags
+
+                # for lines that only have goatee code in them, discard
+				# the trailing newline (unless the user has requested
+				# otherwise)
+				if l[mo.end()] == '\n' and not _ac.preservenl:
+					dnl = True
+
+				# before the match
+				_ac.fout.write(l[:mo.start()])
+
+				# compile and run the expression
+				expr = mo.group('expression')
+				try:
+					expr_code = compile(expr, filename, 'exec')
+					exec(expr_code, globals())
+				except Exception as e:
+					sys.stderr.write('%s: line %d: %s\n' % \
+						(filename, lineno, e))
+
+				# after the match
+				if not dnl:
+					_ac.fout.write(l[mo.end():])
+
+			else:
+				# no match--output whole line
+				_ac.fout.write(l)
+
+	else:
+		for l in fin:
+			_ac.fout.write(l)
+
+	fin.close()
+
+
+#====================================================================
+class AppContext(object):
+	"""Holds information about the application."""
+
+	def __init__(self, argv):
+		global _SCRIPT
+
+		_SCRIPT = os.path.basename(argv.pop(0))
+
+		try:
+			opts, args = getopt.gnu_getopt(argv, 'ho:t:pw',
+				['help', 'output=', 'type=', 'preserve-nl', 'warn-comment'])
+		except getopt.GetoptError:
+			_usage_exit()
+		
+		self.outfilename = None
+		self.typeoverride = None
+		self.preservenl = False
+		self.addcomment = False
+
+		for o, a in opts:
+			if o in ('-h', '--help'):
+				_usage_exit(None, 0)
+			elif o in ('-o', '--output'):
+				self.outfilename = a
+			elif o in ('-t', '--type'):
+				self.typeoverride = a
+			elif o in ('-p', '--preserve-nl'):
+				self.preservenl = True
+			elif o in ('-w', '--warn-comment'):
+				self.addcomment = True
+			else:
+				_usage_exit()
+
+		if len(args) > 1:
+			_usage_exit()
+		elif len(args) == 1:
+			self.infilename = args[0]
+		else:
+			self.infilename = '-'
+
+		# go ahead and open the output file at this point
+		if self.outfilename == None:
+			self.fout = sys.stdout
+		else:
+			self.fout = open(self.outfilename);
+		
+#====================================================================
+def _usage_exit(msg=None, status=1):
+	"""Exit with usage or an error message."""
+	e = sys.stderr
+
+	if msg == None:
+		e.write('usage: %s [options] [file]\n\n' % (_SCRIPT,))
+		e.write('   -h      --help           this help\n')
+		e.write('   -o file --output=file    send output to file (default stdout)\n')
+		e.write('   -t type --type=type      input file type override\n')
+		e.write('   -p      --preserve-nl    preserve newlines on goatee-only lines\n')
+		e.write('   -w      --warn-comment   add a computer-generated warning comment\n')
+		e.write('\n')
+	else:
+		e.write('%s: %s\n' % (_SCRIPT, msg))
+		
+	sys.exit(status)
+
+#====================================================================
+def _printable_filename(filename, is_input=True):
+	if filename == None or filename == '-':
+		if is_input:
+			return '<stdin>'
+		else:
+			return '<stdout>'
+	
+	return filename
+
+#====================================================================
+def _main(argv):
+	"""Main routine"""
+
+	global _ac
+
+	_ac = AppContext(argv)
+
+	mimetypes.init()
+
+	# this line does the work:
+	include(_ac.infilename, evaluate=True, typeoverride=_ac.typeoverride, _root=True)
+
+	return 0
+
+
+if __name__ == "__main__": sys.exit(_main(sys.argv))
+
