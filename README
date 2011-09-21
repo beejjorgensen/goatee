@@ -93,7 +93,7 @@ Usage:
 
      [[import math]]
 
-     The cosine of almost-pi is [[math.cos(3.14)]].
+     The cosine of almost-pi is [[ps(math.cos(3.14))]].
 
   Or do whatever else you can cram into one line of Python:
 
