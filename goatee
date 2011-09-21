@@ -120,7 +120,7 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 	regex = ent['expr']
 
-    # output a comment warning
+	# output a comment warning
 	if _root and _ac.addcomment:
 		_ac.fout.write(ent['comment'] % _warn_comment)
 		_ac.fout.write('\n\n')
@@ -140,7 +140,7 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 				dnl = 'd' in flags
 
-                # for lines that only have goatee code in them, discard
+				# for lines that only have goatee code in them, discard
 				# the trailing newline (unless the user has requested
 				# otherwise)
 				if l[mo.end()] == '\n' and not _ac.preservenl:

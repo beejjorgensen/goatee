@@ -14,7 +14,7 @@ Description:
 
   The original intended purpose was to be used in HTML/JS/CSS build
   pipelines, where the CSS or HTML might need to be processed with file
-  inclusion or variable substitution
+  inclusion or variable substitution.
 
   Goatee is small, simple, and standalone, to be easily included with
   other build-related sources, e.g. Makefiles.
