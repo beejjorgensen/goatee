@@ -103,6 +103,10 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 	else:
 		if typeoverride == None:
 			filetype = mimetypes.guess_type(filename)[0]
+			if filetype == None:
+				# no?  try to get it from the outfile:
+				filetype = mimetypes.guess_type(_ac.outfilename)[0]
+
 		else:
 			filetype = typeoverride
 
@@ -227,7 +231,7 @@ class AppContext(object):
 		if self.outfilename == None:
 			self.fout = sys.stdout
 		else:
-			self.fout = open(self.outfilename);
+			self.fout = open(self.outfilename, 'w');
 		
 #====================================================================
 def _usage_exit(msg=None, status=1):
