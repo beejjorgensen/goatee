@@ -45,14 +45,14 @@ Usage:
 
   An example with file inclusion:
 
-     globals.css.gte:
+     globals.src.css:
      
          [[x = 10]]
          [[y = 20]]
 
-     main.css.gte:
+     main.src.css:
 
-         [[include('globals.css.gte')]]
+         [[include('globals.src.css')]]
 
          #goatlogo {
              top: [[prints(y)]]px;
@@ -61,7 +61,7 @@ Usage:
 
   At this point, running
   
-    goatee -o main.css main.css.gte
+    goatee -o main.css main.src.css
 
   will produce a main.css file with this content:
 

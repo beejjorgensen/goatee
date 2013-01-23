@@ -78,16 +78,33 @@ _warn_comment = "This is a computer-generated file! Do not edit!"
 #====================================================================
 _SCRIPT = 'goatee'
 _ac = None # global app context
+_output = True # true if we should be producing output
+
+
+#====================================================================
+def _write_output(s):
+	"""Write output conditional on the output() flag."""
+	if _output:
+		return _ac.fout.write(str(s))
 
 #====================================================================
 def prints(s):
 	"""Print a string to the output file (python2 can't call it
 	print())."""
-	_ac.fout.write(str(s))
+	return _write_output(str(s))
 
 def ps(s):
 	"""Alias for prints()."""
-	return prints(s)
+	return _write_output(str(s))
+
+#====================================================================
+def output(b):
+	"""Set whether or not goatee should produce output. Expressions are
+	still processed."""
+
+	global _output
+
+	_output = b
 
 #====================================================================
 def include(filename, evaluate=True, typeoverride=None, _root=False):
@@ -104,9 +121,10 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 		if typeoverride == None:
 			filetype = mimetypes.guess_type(filename)[0]
 			if filetype == None:
-				# no?  try to get it from the outfile:
-				filetype = mimetypes.guess_type(_ac.outfilename)[0]
-
+				if _ac.outfilename != None:
+					# no?  try to get it from the outfile:
+					sys.stderr.write("%s\n" % _ac.outfilename)
+					filetype = mimetypes.guess_type(_ac.outfilename)[0]
 		else:
 			filetype = typeoverride
 
@@ -126,8 +144,8 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 	# output a comment warning
 	if _root and _ac.addcomment:
-		_ac.fout.write(ent['comment'] % _warn_comment)
-		_ac.fout.write('\n\n')
+		_write_output(ent['comment'] % _warn_comment)
+		_write_output('\n\n')
 
 	if evaluate:
 		lineno = 0
@@ -160,11 +178,12 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 				# before the match
 				if not discard_leading:
-					_ac.fout.write(l[:mo.start()])
+					_write_output(l[:mo.start()])
 
 				# compile and run the expression
 				expr = mo.group('expression')
 				try:
+					expr = expr.strip()
 					expr_code = compile(expr, filename, 'exec')
 					exec(expr_code, globals())
 				except Exception as e:
@@ -173,15 +192,16 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 
 				# after the match
 				if not dnl:
-					_ac.fout.write(l[mo.end():])
+					_write_output(l[mo.end():])
 
 			else:
 				# no match--output whole line
-				_ac.fout.write(l)
+				_write_output(l)
 
 	else:
+		# evaluate flag false, so just write 'em as we get 'em
 		for l in fin:
-			_ac.fout.write(l)
+			_write_output(l)
 
 	fin.close()
 
