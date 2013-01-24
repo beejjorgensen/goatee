@@ -51,6 +51,7 @@ import sys
 import re
 import mimetypes
 import getopt
+import os
 import os.path
 
 # regexes for goatee expressions by input file MIME type:
@@ -80,12 +81,34 @@ _SCRIPT = 'goatee'
 _ac = None # global app context
 _output = True # true if we should be producing output
 
-
 #====================================================================
 def _write_output(s):
 	"""Write output conditional on the output() flag."""
 	if _output:
 		return _ac.fout.write(str(s))
+
+#====================================================================
+def ifndef(s):
+	output(not envdef(s))
+
+def ifdef(s, v=None):
+	if v == None:
+		output(envdef(s))
+	else:
+		output(env(s) == v)
+
+def endif():
+	output(True)
+
+#====================================================================
+def envdef(s):
+	return s in os.environ
+
+def env(s):
+	if envdef(s):
+		return os.environ[s]
+
+	return ''
 
 #====================================================================
 def prints(s):
