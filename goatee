@@ -88,14 +88,14 @@ def _write_output(s):
 		return _ac.fout.write(str(s))
 
 #====================================================================
-def ifndef(s):
-	output(not envdef(s))
+def ifndef(s, v=None):
+	output((not envdef(s)) or (env(s) != str(v)))
 
 def ifdef(s, v=None):
 	if v == None:
 		output(envdef(s))
 	else:
-		output(env(s) == v)
+		output(env(s) == str(v))
 
 def endif():
 	output(True)
