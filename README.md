@@ -130,6 +130,14 @@ to the current output file (ps is shorthand for prints).
 
 
 -------------------------------------------------------------------------
+    output(b)
+
+If true, processed input data should be printed to output. False if the
+output should be quiet. Also silences calls to `prints()`. Subsequent
+Python commands are processed normally in any case.
+
+
+-------------------------------------------------------------------------
     env(var)
 
 Returns the value of the given environment variable, or an empty string
