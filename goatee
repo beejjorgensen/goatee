@@ -89,7 +89,10 @@ def _write_output(s):
 
 #====================================================================
 def ifndef(s, v=None):
-	output((not envdef(s)) or (env(s) != str(v)))
+	if v == None:
+		output(not envdef(s))
+	else:
+		output(env(s) != str(v))
 
 def ifdef(s, v=None):
 	if v == None:
