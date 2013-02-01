@@ -163,6 +163,13 @@ Example:
     <script src="site-min.js"></script>
     [[ endif() ]]
 
+CHEESINESS WARNING: all Python commands inside the ifdef/endif block are
+unconditionally executed!  (`prints()` is muted, however.)  I realize
+this isn't as neat as it could be, but I feel it still beats defiling
+the code to support it.
+
+CHEESINESS WARNING: ifdefs don't nest.
+
 Command Line Usage
 ------------------
 
