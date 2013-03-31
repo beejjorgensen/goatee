@@ -41,7 +41,8 @@ currently must be on the same line) will be executed in the Python
 interpreter (spaces around the expression next to the delimiter marks
 are stripped):
 
-    [[x = 10]]Hey, I think x is [[prints(x)]]!
+    [[x = 10]]
+    Hey, I think x is [[prints(x)]]!
 
 would output:
 
@@ -135,6 +136,13 @@ to the current output file (ps is shorthand for prints).
 If true, processed input data should be printed to output. False if the
 output should be quiet. Also silences calls to `prints()`. Subsequent
 Python commands are processed normally in any case.
+
+
+-------------------------------------------------------------------------
+    source(filename)
+
+Executes the Python source in filename in the global namespace. This can
+be useful for defining more Python functions to have at your disposal.
 
 
 -------------------------------------------------------------------------

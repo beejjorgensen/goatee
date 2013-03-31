@@ -133,6 +133,18 @@ def output(b):
 	_output = b
 
 #====================================================================
+def source(filename):
+	"""Function to execute a Python file in the global namespace."""
+	fp = open(filename)
+	d = fp.read()
+	fp.close()
+	try:
+		exec(d, globals())
+	except Exception as a:
+		sys.stderr.write("%s: %s\n" % (filename, a))
+		
+
+#====================================================================
 def include(filename, evaluate=True, typeoverride=None, _root=False):
 	"""Function to include a file in the output stream."""
 
