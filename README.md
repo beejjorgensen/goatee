@@ -36,10 +36,8 @@ Features
 Usage
 -----
 
-Anything between the goatee code delimiter marks `[[` and `]]` (which
-currently must be on the same line) will be executed in the Python
-interpreter (spaces around the expression next to the delimiter marks
-are stripped):
+Anything between the goatee code delimiter marks `[[` and `]]` will be
+executed in the Python interpreter:
 
     [[x = 10]]
     Hey, I think x is [[prints(x)]]!
@@ -103,6 +101,22 @@ Or do whatever else you can cram into one line of Python:
 
     the numbers 1-10 are [[for i in range(10): ps(" %s" % (i+1))]].
 
+Or multiple lines:
+
+    [[
+    def hello(s)
+        ps('Hello, %s!\n', % s)
+
+    hello('World')
+    ]]
+
+    [[ hello('Mars') ]]
+
+On an expression that is on a single line, spaces around the expression
+are stripped:
+
+    [[  ps('this works')    ]]
+    [[ps('so does this')]]
 
 Built-in Functions
 ------------------

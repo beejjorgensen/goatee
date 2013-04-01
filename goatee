@@ -23,7 +23,7 @@
 # 
 # License (MIT):
 # 
-#   Copyright (c) 2011  Brian "Beej Jorgensen" Hall <beej@beej.us>
+#   Copyright (c) 2013  Brian "Beej Jorgensen" Hall <beej@beej.us>
 # 
 #   Permission is hereby granted, free of charge, to any person
 #   obtaining a copy of this software and associated documentation files
@@ -58,17 +58,20 @@ import os.path
 
 _goatee_patterns = {
 	'text/html': {
-		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'start': r'\[\[',
+		'end': r'\](?P<flags>.*?)\]',
 		'comment': '<!-- %s -->'
 	},
 
 	'text/css': {
-		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'start': r'\[\[',
+		'end': r'\](?P<flags>.*?)\]',
 		'comment': '/* %s */'
 	},
 
 	'application/javascript': {
-		'expr': r'\[\[(?P<expression>.+?)\](?P<flags>.*?)\]',
+		'start': r'\[\[',
+		'end': r'\](?P<flags>.*?)\]',
 		'comment': '/* %s */'
 	},
 }
@@ -89,25 +92,31 @@ def _write_output(s):
 
 #====================================================================
 def ifndef(s, v=None):
+	"""Enable output if an environment variable is not defined."""
 	if v == None:
 		output(not envdef(s))
 	else:
 		output(env(s) != str(v))
 
 def ifdef(s, v=None):
+	"""Enable output if an environment variable is defined."""
 	if v == None:
 		output(envdef(s))
 	else:
 		output(env(s) == str(v))
 
 def endif():
+	"""Enable output after an ifdef() or ifndef()."""
 	output(True)
 
 #====================================================================
 def envdef(s):
+	"""Return True if an environment variable is defined."""
 	return s in os.environ
 
 def env(s):
+	"""Return value of an environment variable, or empty string if
+	undefined."""
 	if envdef(s):
 		return os.environ[s]
 
@@ -145,6 +154,21 @@ def source(filename):
 		
 
 #====================================================================
+def _runExpression(expr, filename, lineno, strip):
+	"""Compile and run a Python expression, catching errors."""
+	try:
+		if strip:
+			expr = expr.strip()
+
+		expr_code = compile(expr, filename, 'exec')
+		exec(expr_code, globals())
+
+	except Exception as e:
+		sys.stderr.write('%s: line %d: %s\n' % \
+			(filename, lineno, e))
+
+
+#====================================================================
 def include(filename, evaluate=True, typeoverride=None, _root=False):
 	"""Function to include a file in the output stream."""
 
@@ -178,12 +202,20 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 	# find the entry for this filetype
 	ent = _goatee_patterns[filetype]
 
-	regex = ent['expr']
+	start_regex = ent['start']
+	end_regex = ent['end']
 
 	# output a comment warning
 	if _root and _ac.addcomment:
 		_write_output(ent['comment'] % _warn_comment)
 		_write_output('\n\n')
+
+	inMatch = False # true if we're inside the delimiters
+	copyBuf = '' # buffer to accumulate text
+	execBuf = '' # buffer to accumulate commands
+	dnl = False
+	startLine = -1
+	endLine = -2
 
 	if evaluate:
 		lineno = 0
@@ -191,51 +223,92 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 		for l in fin:
 			lineno += 1
 
-			# we rely on Python's internal caching of regexes, since we
-			# only have a few of them
-			mo = re.search(regex, l);
+			first = True # first pass on l
+			solo = True # true if [[ ]] is on a line by itself
 
-			if mo:
-				flags = mo.group('flags')
+			while len(l) > 0:
 
-				dnl = 'd' in flags
+				if inMatch:
+					mo = re.search(end_regex, l);
 
-				leading = l[:mo.start()]
-				trailing = l[mo.end():]
+				else:  # else we're out of match
+					mo = re.search(start_regex, l);
 
-				# for lines that only have goatee code in them, discard
-				# the whitespace (unless the user has requested
-				# otherwise)
-				if leading.strip() == '' and trailing.strip() == '' \
-					and not _ac.preservenl:
+				# do processing that looks for flags and handles
+				# detection of solo commands
+				# also accumulate buffers
+				if mo:
+					beforeMatch = l[:mo.start()]
+					afterMatch = l[mo.end():]
 
-					discard_leading = True
-					dnl = True
+					if inMatch:
+						# must have just got an out-of-match tag ]]
+						flags = mo.group('flags')
+						dnl = 'd' in flags
+
+						if afterMatch.strip() != '':
+							solo = False
+
+						#if solo and not _ac.preservenl:
+						#	dnl = True
+
+						execBuf += beforeMatch
+
+					else:
+						# must have just got an in-match tag [[
+						if first:
+							if beforeMatch.strip() != '':
+								solo = False
+							first = False
+
+						copyBuf += beforeMatch
+
+
+					if dnl:
+						l = ''
+						dnl = False
+					else:
+						l = afterMatch
+
 				else:
-					discard_leading = False
+					if inMatch:
+						execBuf += l
+					else:
+						copyBuf += l
+					l = ''
 
-				# before the match
-				if not discard_leading:
-					_write_output(l[:mo.start()])
+				# look for state changes
+				# run commands, generate other output
+				if mo:
+					if inMatch:
+						# switching to out of match
 
-				# compile and run the expression
-				expr = mo.group('expression')
-				try:
-					expr = expr.strip()
-					expr_code = compile(expr, filename, 'exec')
-					exec(expr_code, globals())
-				except Exception as e:
-					sys.stderr.write('%s: line %d: %s\n' % \
-						(filename, lineno, e))
+						endLine = lineno
 
-				# after the match
-				if not dnl:
-					_write_output(l[mo.end():])
+						# strip whitespace off things that start and end
+						# on the same line
+						strip = startLine == endLine
 
-			else:
-				# no match--output whole line
-				_write_output(l)
+						# output buffer
+						_write_output(copyBuf)
 
+						# eval buffer
+						_runExpression(execBuf, filename, lineno, strip)
+
+						startLine = -1
+
+						copyBuf = execBuf = ''
+
+					else:
+						# switching to in match
+
+						startLine = lineno
+
+					inMatch = not inMatch
+
+		# output last buffer
+		_write_output(copyBuf)
+		copyBuf = ''
 	else:
 		# evaluate flag false, so just write 'em as we get 'em
 		for l in fin:
