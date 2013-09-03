@@ -74,6 +74,12 @@ _goatee_patterns = {
 		'end': r'\](?P<flags>.*?)\]',
 		'comment': '/* %s */'
 	},
+
+	'text/javascript': {
+		'start': r'\[\[',
+		'end': r'\](?P<flags>.*?)\]',
+		'comment': '/* %s */'
+	},
 }
 
 # comment to be added to the top of the output file with -w:
@@ -169,7 +175,7 @@ def _runExpression(expr, filename, lineno, strip):
 
 
 #====================================================================
-def include(filename, evaluate=True, typeoverride=None, _root=False):
+def include(filename, evaluate=True, typeoverride=None, optional=False, _root=False):
 	"""Function to include a file in the output stream."""
 
 	global _ac
@@ -185,12 +191,19 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 			if filetype == None:
 				if _ac.outfilename != None:
 					# no?  try to get it from the outfile:
-					sys.stderr.write("%s\n" % _ac.outfilename)
+					#sys.stderr.write("%s\n" % _ac.outfilename)
 					filetype = mimetypes.guess_type(_ac.outfilename)[0]
 		else:
 			filetype = typeoverride
 
-		fin = open(filename)
+		try:
+			fin = open(filename)
+		except FileNotFoundError as e:
+			if optional:
+				#sys.stderr.write("Missing optional file: %s\n" % filename);
+				return
+			else:
+				raise e
 
 	if filetype == None:
 		_usage_exit('%s: file type unknown' % _printable_filename(filename))
@@ -223,9 +236,6 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 		for l in fin:
 			lineno += 1
 
-			first = True # first pass on l
-			solo = True # true if [[ ]] is on a line by itself
-
 			while len(l) > 0:
 
 				if inMatch:
@@ -235,7 +245,6 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 					mo = re.search(start_regex, l);
 
 				# do processing that looks for flags and handles
-				# detection of solo commands
 				# also accumulate buffers
 				if mo:
 					beforeMatch = l[:mo.start()]
@@ -246,21 +255,10 @@ def include(filename, evaluate=True, typeoverride=None, _root=False):
 						flags = mo.group('flags')
 						dnl = 'd' in flags
 
-						if afterMatch.strip() != '':
-							solo = False
-
-						#if solo and not _ac.preservenl:
-						#	dnl = True
-
 						execBuf += beforeMatch
 
 					else:
 						# must have just got an in-match tag [[
-						if first:
-							if beforeMatch.strip() != '':
-								solo = False
-							first = False
-
 						copyBuf += beforeMatch
 
 
@@ -327,14 +325,13 @@ class AppContext(object):
 		_SCRIPT = os.path.basename(argv.pop(0))
 
 		try:
-			opts, args = getopt.gnu_getopt(argv, 'ho:t:pw',
-				['help', 'output=', 'type=', 'preserve-nl', 'warn-comment'])
+			opts, args = getopt.gnu_getopt(argv, 'ho:t:w',
+				['help', 'output=', 'type=', 'warn-comment'])
 		except getopt.GetoptError:
 			_usage_exit()
 		
 		self.outfilename = None
 		self.typeoverride = None
-		self.preservenl = False
 		self.addcomment = False
 
 		for o, a in opts:
@@ -344,8 +341,6 @@ class AppContext(object):
 				self.outfilename = a
 			elif o in ('-t', '--type'):
 				self.typeoverride = a
-			elif o in ('-p', '--preserve-nl'):
-				self.preservenl = True
 			elif o in ('-w', '--warn-comment'):
 				self.addcomment = True
 			else:
@@ -374,7 +369,6 @@ def _usage_exit(msg=None, status=1):
 		e.write('   -h      --help           this help\n')
 		e.write('   -o file --output=file    send output to file (default stdout)\n')
 		e.write('   -t type --type=type      input file type override\n')
-		e.write('   -p      --preserve-nl    preserve newlines on goatee-only lines\n')
 		e.write('   -w      --warn-comment   add a computer-generated warning comment\n')
 		e.write('\n')
 	else:
