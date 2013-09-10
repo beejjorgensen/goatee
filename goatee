@@ -59,25 +59,25 @@ import os.path
 _goatee_patterns = {
 	'text/html': {
 		'start': r'\[\[',
-		'end': r'\](?P<flags>.*?)\]',
+		'end': r'\](?P<flags>\w*?)\]',
 		'comment': '<!-- %s -->'
 	},
 
 	'text/css': {
 		'start': r'\[\[',
-		'end': r'\](?P<flags>.*?)\]',
+		'end': r'\](?P<flags>\w*?)\]',
 		'comment': '/* %s */'
 	},
 
 	'application/javascript': {
 		'start': r'\[\[',
-		'end': r'\](?P<flags>.*?)\]',
+		'end': r'\](?P<flags>\w*?)\]',
 		'comment': '/* %s */'
 	},
 
 	'text/javascript': {
 		'start': r'\[\[',
-		'end': r'\](?P<flags>.*?)\]',
+		'end': r'\](?P<flags>\w*?)\]',
 		'comment': '/* %s */'
 	},
 }
